@@ -1,73 +1,100 @@
-import os
 import customtkinter as ctk
+from tkinter import filedialog, messagebox
+import os
+import py7zr
 import zipfile
 import tarfile
 import gzip
 import shutil
-import py7zr
-from cryptography.fernet import Fernet
 
-def compress_zip(file_paths, output_path):
-    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as archive:
-        for file_path in file_paths:
-            archive.write(file_path, os.path.basename(file_path))
+# Function to compress files
+def compress_files(method, level, password, files):
+    if method == "zip":
+        with zipfile.ZipFile("output.zip", "w", compression=zipfile.ZIP_DEFLATED, compresslevel=level) as zipf:
+            for file in files:
+                zipf.write(file, os.path.basename(file))
+    elif method == "7z":
+        with py7zr.SevenZipFile("output.7z", 'w', password=password) as archive:
+            archive.writeall(files)
+    elif method == "tar":
+        with tarfile.open("output.tar.gz", "w:gz") as tar:
+            for file in files:
+                tar.add(file)
+    elif method == "gzip":
+        with gzip.open("output.gz", "wb") as gz:
+            for file in files:
+                with open(file, "rb") as f:
+                    shutil.copyfileobj(f, gz)
 
-def compress_tar(file_paths, output_path):
-    with tarfile.open(output_path, 'w') as archive:
-        for file_path in file_paths:
-            archive.add(file_path, arcname=os.path.basename(file_path))
+# Function to extract files
+def extract_files(file):
+    if file.endswith(".zip"):
+        with zipfile.ZipFile(file, "r") as zipf:
+            zipf.extractall()
+    elif file.endswith(".7z"):
+        with py7zr.SevenZipFile(file, 'r') as archive:
+            archive.extractall()
+    elif file.endswith(".tar.gz"):
+        with tarfile.open(file, "r:gz") as tar:
+            tar.extractall()
+    elif file.endswith(".gz"):
+        with gzip.open(file, "rb") as gz:
+            with open(file.replace(".gz", ""), "wb") as f:
+                shutil.copyfileobj(gz, f)
 
-def compress_gzip(file_paths, output_path):
-    with tarfile.open(output_path, 'w:gz') as archive:
-        for file_path in file_paths:
-            archive.add(file_path, arcname=os.path.basename(file_path))
+# GUI Setup
+class CompressorGUI(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-def compress_7z(file_paths, output_path, level=5, password=None):
-    with py7zr.SevenZipFile(output_path, 'w', password=password) as archive:
-        for file_path in file_paths:
-            archive.write(file_path, os.path.basename(file_path))
+        self.title("Compressor GUI")
+        self.geometry("400x300")
 
-def encrypt_file(file_path, key):
-    with open(file_path, 'rb') as file:
-        data = file.read()
-    fernet = Fernet(key)
-    encrypted = fernet.encrypt(data)
-    with open(file_path, 'wb') as file:
-        file.write(encrypted)
+        self.method_label = ctk.CTkLabel(self, text="Compression Method:")
+        self.method_label.pack(pady=10)
+        
+        self.method_option = ctk.CTkOptionMenu(self, values=["zip", "7z", "tar", "gzip"])
+        self.method_option.pack(pady=10)
 
-def decrypt_file(file_path, key):
-    with open(file_path, 'rb') as file:
-        encrypted_data = file.read()
-    fernet = Fernet(key)
-    decrypted = fernet.decrypt(encrypted_data)
-    with open(file_path, 'wb') as file:
-        file.write(decrypted)
+        self.level_label = ctk.CTkLabel(self, text="Compression Level:")
+        self.level_label.pack(pady=10)
+        
+        self.level_slider = ctk.CTkSlider(self, from_=1, to_=22)
+        self.level_slider.pack(pady=10)
 
-def start_compression(file_paths, compression_type, output_path, level, password):
-    if compression_type == "ZIP":
-        compress_zip(file_paths, output_path)
-    elif compression_type == "TAR":
-        compress_tar(file_paths, output_path)
-    elif compression_type == "GZIP":
-        compress_gzip(file_paths, output_path)
-    elif compression_type == "7z":
-        compress_7z(file_paths, output_path, level, password)
-    else:
-        raise ValueError("Unsupported compression type")
+        self.password_label = ctk.CTkLabel(self, text="Password (optional):")
+        self.password_label.pack(pady=10)
+        
+        self.password_entry = ctk.CTkEntry(self)
+        self.password_entry.pack(pady=10)
 
-def verify_integrity(file_path):
-    return os.path.exists(file_path) and os.path.getsize(file_path) > 0
+        self.select_button = ctk.CTkButton(self, text="Select Files", command=self.select_files)
+        self.select_button.pack(pady=10)
 
-# إعداد واجهة المستخدم
-def create_gui():
-    root = ctk.CTk()
-    root.title("MyCompressor")
-    root.geometry("600x400")
+        self.compress_button = ctk.CTkButton(self, text="Start Compression", command=self.start_compression)
+        self.compress_button.pack(pady=10)
 
-    # إعداد مكونات الواجهة
-    # ...
+        self.extract_button = ctk.CTkButton(self, text="Extract Files", command=self.extract_files)
+        self.extract_button.pack(pady=10)
 
-    root.mainloop()
+        self.files = []
+
+    def select_files(self):
+        self.files = filedialog.askopenfilenames()
+        messagebox.showinfo("Selected Files", "\n".join(self.files))
+
+    def start_compression(self):
+        method = self.method_option.get()
+        level = int(self.level_slider.get())
+        password = self.password_entry.get()
+        compress_files(method, level, password, self.files)
+        messagebox.showinfo("Compression Complete", "Files have been compressed successfully!")
+
+    def extract_files(self):
+        file = filedialog.askopenfilename()
+        extract_files(file)
+        messagebox.showinfo("Extraction Complete", "Files have been extracted successfully!")
 
 if __name__ == "__main__":
-    create_gui()
+    app = CompressorGUI()
+    app.mainloop()
