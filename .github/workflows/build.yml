@@ -34,4 +34,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: compressor_gui
-        path: dist/compressor_gui/compressor_gui.exe
+        path: dist/compressor_gui.exe
