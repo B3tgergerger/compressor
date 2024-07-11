@@ -55,6 +55,9 @@ def start_compression(file_paths, compression_type, output_path, level, password
     else:
         raise ValueError("Unsupported compression type")
 
+def verify_integrity(file_path):
+    return os.path.exists(file_path) and os.path.getsize(file_path) > 0
+
 # إعداد واجهة المستخدم
 def create_gui():
     root = ctk.CTk()
